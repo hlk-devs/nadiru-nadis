@@ -145,8 +145,8 @@ async function apiHealth() {
   return r.json();
 }
 
-function fmtCost(c) { return c===0?"free":c<0.001?`$${c.toFixed(6)}`:c<0.01?`$${c.toFixed(4)}`:`$${c.toFixed(3)}`; }
-function fmtMs(ms) { return ms<1000?`${ms}ms`:`${(ms/1000).toFixed(1)}s`; }
+function fmtCost(c) { if(c===undefined||c===null)return "..."; return c===0?"free":c<0.001?`$${c.toFixed(6)}`:c<0.01?`$${c.toFixed(4)}`:`$${c.toFixed(3)}`; }
+function fmtMs(ms) { if(ms===undefined||ms===null)return "..."; return ms<1000?`${ms}ms`:`${(ms/1000).toFixed(1)}s`; }
 function shortModel(m) { return m ? m.split("-").slice(0,3).join("-") : "?"; }
 
 function renderContent(text) {
@@ -217,13 +217,71 @@ function App() {
   const send=useCallback(async()=>{
     if(!input.trim()||loading)return;
     const u=input.trim();setInput("");
-    setMsgs(p=>[...p,{role:"user",content:u}]);setLoading(true);
-    try{
+    setMsgs(p=>[...p,{role:"user",content:u},{role:"assistant",content:"",routing:null,streaming:true}]);setLoading(true);
+    const fallback=async()=>{
       const r=await apiGenerate(nadiId,u,priority,hist);
-      setMsgs(p=>[...p,{role:"assistant",content:r.content,routing:{provider:r.provider,model:r.model,cost:r.cost_estimate,latency:r.latency_ms,reason:r.routing_reason}}]);
+      setMsgs(p=>{
+        const n=[...p];
+        const last=n[n.length-1];
+        if(last&&last.role==="assistant"&&last.streaming){
+          n[n.length-1]={role:"assistant",content:r.content,routing:{provider:r.provider,model:r.model,cost:r.cost_estimate,latency:r.latency_ms,reason:r.routing_reason}};
+        }else n.push({role:"assistant",content:r.content,routing:{provider:r.provider,model:r.model,cost:r.cost_estimate,latency:r.latency_ms,reason:r.routing_reason}});
+        return n;
+      });
       setHist(p=>[...p,{role:"user",content:u},{role:"assistant",content:r.content}].slice(-40));
       await load();
-    }catch(e){setMsgs(p=>[...p,{role:"assistant",content:"Error: "+e.message,error:true}]);}
+    };
+    try{
+      const payload={nadi_id:nadiId,prompt:u,priority};
+      if(hist?.length)payload.messages=hist;
+      const response=await fetch(`${ENGINE}/generate/stream`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+      if(!response.ok||!response.body)throw new Error("stream unavailable");
+      const reader=response.body.getReader();
+      const decoder=new TextDecoder();
+      let buffer="";
+      let assistantContent="";
+      while(true){
+        const {done,value}=await reader.read();
+        if(done)break;
+        buffer+=decoder.decode(value,{stream:true});
+        const parts=buffer.split("\n\n");
+        buffer=parts.pop()||"";
+        for(const line of parts){
+          if(!line.startsWith("data: "))continue;
+          let data;
+          try{data=JSON.parse(line.slice(6));}catch{continue;}
+          if(data.type==="routing"){
+            setMsgs(prev=>{
+              const n=[...prev];
+              const last=n[n.length-1];
+              if(last&&last.role==="assistant")n[n.length-1]={...last,routing:{provider:data.provider,model:data.model,cost:null,latency:null,reason:data.reason}};
+              return n;
+            });
+          }else if(data.type==="token"){
+            assistantContent+=data.content||"";
+            const text=assistantContent;
+            setMsgs(prev=>{
+              const n=[...prev];
+              const last=n[n.length-1];
+              if(last&&last.role==="assistant")n[n.length-1]={...last,content:text};
+              return n;
+            });
+          }else if(data.type==="done"){
+            setMsgs(prev=>{
+              const n=[...prev];
+              const last=n[n.length-1];
+              if(last&&last.role==="assistant")n[n.length-1]={...last,content:assistantContent,routing:{provider:data.provider,model:data.model,cost:data.cost_estimate,latency:data.latency_ms,reason:data.routing_reason},streaming:false};
+              return n;
+            });
+            setHist(p=>[...p,{role:"user",content:u},{role:"assistant",content:assistantContent}].slice(-40));
+            await load();
+          }else if(data.type==="error")throw new Error(data.message||"stream error");
+        }
+      }
+    }catch(e){
+      setMsgs(p=>p.slice(0,-1));
+      try{await fallback();}catch(e2){setMsgs(p=>[...p,{role:"assistant",content:"Error: "+(e2.message||e.message),error:true}]);}
+    }
     setLoading(false);inputRef.current?.focus();
   },[input,loading,nadiId,priority,hist,load]);
 
@@ -233,7 +291,7 @@ function App() {
 
   if(error) return (
     <div style={{height:"100vh",display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:16}}>
-      <div style={{fontSize:40,opacity:0.15}}>⚡</div>
+      <div style={{fontSize:40,opacity:0.15}}>*</div>
       <div style={{fontSize:15,color:"var(--text-secondary)",maxWidth:400,textAlign:"center",lineHeight:1.6}}>{error}</div>
       <button onClick={()=>location.reload()} style={{padding:"8px 20px",borderRadius:8,border:"1px solid var(--border-subtle)",background:"var(--surface-primary)",color:"var(--text-secondary)",fontSize:13,cursor:"pointer",fontFamily:"var(--font-body)"}}>Retry</button>
     </div>
@@ -267,7 +325,7 @@ function App() {
 
       <div className="chat-area" style={{marginRight:showPanel?340:0}}>
         <div className="chat-inner">
-          {msgs.length===0&&<div className="empty-state"><div style={{fontSize:32}}>⚡</div><div style={{fontSize:14,color:"var(--text-tertiary)"}}>Start a conversation. The Conductor routes intelligently.</div></div>}
+          {msgs.length===0&&<div className="empty-state"><div style={{fontSize:32}}>*</div><div style={{fontSize:14,color:"var(--text-tertiary)"}}>Start a conversation. The Conductor routes intelligently.</div></div>}
           {msgs.map((m,i)=>(
             <div key={i} className="msg-enter" style={{marginBottom:m.role==="user"?8:24}}>
               {m.role==="user"?(
@@ -292,7 +350,7 @@ function App() {
               )}
             </div>
           ))}
-          {loading&&<div className="loading-dots"><span></span><span></span><span></span></div>}
+          {loading&&!msgs.some(m=>m.streaming)&&<div className="loading-dots"><span></span><span></span><span></span></div>}
           <div ref={endRef}/>
         </div>
       </div>
@@ -323,7 +381,7 @@ function App() {
             <div key={k} style={{marginBottom:12}}>
               <div style={{display:"flex",justifyContent:"space-between",fontSize:12,marginBottom:4}}>
                 <span style={{color:"var(--text-secondary)",fontWeight:500}}>{k.split("/").pop()}</span>
-                <span style={{color:"var(--text-tertiary)"}}>{d.count}× · {fmtCost(d.cost)}</span>
+                <span style={{color:"var(--text-tertiary)"}}>{d.count}x | {fmtCost(d.cost)}</span>
               </div>
               <div className="model-bar-bg"><div className="model-bar-fill" style={{width:`${pct}%`,background:k.includes("ollama")?"var(--accent-local)":"var(--accent-cloud)"}}/></div>
             </div>
@@ -332,7 +390,7 @@ function App() {
           {interactions.slice(0,20).map((ix,i)=>(
             <div key={i} className="feed-item">
               <div className="feed-prompt">{ix.prompt?.slice(0,50)}{ix.prompt?.length>50?"...":""}</div>
-              <div className="feed-meta">{ix.provider}/{shortModel(ix.model)} · {fmtCost(ix.cost_estimate)} · {ix.routing_reason?.slice(0,60)}</div>
+              <div className="feed-meta">{ix.provider}/{shortModel(ix.model)} | {fmtCost(ix.cost_estimate)} | {ix.routing_reason?.slice(0,60)}</div>
             </div>
           ))}
         </div>
