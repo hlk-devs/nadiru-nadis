@@ -1,4 +1,4 @@
-"""
+﻿"""
 nadi-health — Test all configured providers.
 
 Sends a tiny prompt to each provider and reports status and latency.
@@ -12,7 +12,6 @@ import time
 import httpx
 
 ENGINE = "http://localhost:8765"
-TEST_PROMPT = "Reply with the single word OK."
 
 
 def main():
@@ -31,14 +30,6 @@ def main():
         print("  Start with: python -m nadiru_engine")
         sys.exit(1)
 
-    # Connect a test nadi
-    resp = httpx.post(f"{ENGINE}/connect", json={
-        "name": "nadi-health",
-        "description": "Provider health check",
-        "default_priority": "cost",
-    }, timeout=10.0)
-    nadi_id = resp.json()["nadi_id"]
-
     providers = health.get("providers", [])
     if not providers:
         print("\n  No paid providers configured.")
@@ -50,34 +41,48 @@ def main():
     for provider in providers:
         start = time.time()
         try:
-            resp = httpx.post(f"{ENGINE}/generate", json={
-                "nadi_id": nadi_id,
-                "prompt": TEST_PROMPT,
-                "prefer_provider": provider,
-                "priority": "cost",
-            }, timeout=60.0)
+            resp = httpx.post(
+                f"{ENGINE}/test-provider",
+                params={"provider_name": provider},
+                timeout=60.0,
+            )
             elapsed = time.time() - start
-            data = resp.json()
+            if resp.status_code != 200:
+                try:
+                    detail = resp.json().get("detail", resp.text)
+                except Exception:
+                    detail = resp.text
+                results.append({
+                    "provider": provider,
+                    "status": f"HTTP {resp.status_code}",
+                    "latency": elapsed,
+                    "model": "?",
+                    "cost": 0,
+                })
+                print(f"  {provider:20s}  HTTP {resp.status_code}: {str(detail)[:40]}")
+                continue
 
-            actual_provider = data.get("provider", "?")
+            data = resp.json()
             model = data.get("model", "?")
             cost = data.get("cost_estimate", 0)
-            content = data.get("content", "")[:50]
-            routed_correctly = actual_provider == provider
+            api_status = data.get("status", "error")
+            err = data.get("error")
+            lat_ms = data.get("latency_ms")
 
-            if routed_correctly:
+            if api_status == "ok" and not err:
                 status = "OK"
             else:
-                status = f"REROUTED → {actual_provider}"
+                status = f"ERROR: {err or 'unknown'}"
 
+            lat_disp = (lat_ms / 1000.0) if lat_ms is not None else elapsed
             results.append({
                 "provider": provider,
                 "status": status,
-                "latency": elapsed,
+                "latency": lat_disp,
                 "model": model,
                 "cost": cost,
             })
-            print(f"  {provider:20s}  {status:20s}  {elapsed:.1f}s  {model}")
+            print(f"  {provider:20s}  {status:20s}  {lat_disp:.1f}s  {model}")
 
         except Exception as e:
             elapsed = time.time() - start
