@@ -74,10 +74,11 @@ def main():
     result = summarize(nadi_id, text, length)
 
     print(result["content"])
+    cost = result["cost_estimate"]
+    cost_str = "free" if cost == 0 else f"${cost:.6f}"
     print(
         f"\n[{result['provider']}/{result['model']}] "
-        f"{'free' if result['cost_estimate'] == 0 else f'${result[\"cost_estimate\"]:.6f}'} · "
-        f"{result['latency_ms']}ms"
+        f"{cost_str} · {result['latency_ms']}ms"
     )
 
 
