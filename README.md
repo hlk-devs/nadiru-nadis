@@ -1,8 +1,21 @@
 # Nadiru Nadis
 
-Tools and applications built on the [Nadiru engine](https://github.com/hlk-devs/nadiru-engine).
+## What is a Nadi?
 
-Each Nadi is a standalone tool that talks to a running Nadiru engine via its REST API. No engine code is imported — everything goes through `/connect`, `/generate`, and `/query`.
+A Nadi is any application that connects to the
+[Nadiru engine](https://github.com/hlk-devs/nadiru-engine).
+The engine handles intelligent routing between AI providers —
+your Nadi just sends prompts and gets responses. Build a chatbot,
+a translation tool, a code assistant, a data pipeline, a full
+SaaS product — anything that needs AI goes through Nadiru.
+
+**The engine is the brain. Your Nadi is the body.**
+
+The engine discovers 130+ models across 15+ providers, routes
+intelligently based on task type and priority, streams responses,
+detects content refusals and retries automatically, and learns
+from every interaction. Your Nadi gets all of this for free
+through three HTTP endpoints.
 
 ## Nadis
 
