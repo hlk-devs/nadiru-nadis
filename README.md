@@ -31,6 +31,7 @@ through three HTTP endpoints.
 | [nadi-commit](nadi-commit/) | Git commit message generator | `python commit.py` |
 | [nadi-shell](nadi-shell/) | Natural language to shell command | `python shell.py "query"` |
 | [nadi-scraper](nadi-scraper/) | Web scraper generator | `python scraper.py "task"` |
+| [nadi-builder](nadi-builder/) | Build Nadis with AI + independent code review | Open `index.html` |
 
 ## Building Your Own Nadi
 

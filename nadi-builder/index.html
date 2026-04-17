@@ -1,0 +1,287 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nadi Builder</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#0a0a0b; --surface-primary:#141416; --surface-inset:#1a1a1e; --surface-panel:#111113; --surface-code:#0d0d0f;
+  --border-subtle:rgba(255,255,255,0.08); --text-primary:#e8e8ed; --text-secondary:#a0a0ab; --text-tertiary:#5c5c66;
+  --accent:#7c8aff; --ok:#34d399; --warn:#f59e0b; --bad:#f87171;
+  --font-body:'DM Sans', -apple-system, system-ui, sans-serif; --font-mono:'JetBrains Mono', monospace;
+}
+*{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text-primary);font-family:var(--font-body)}
+.container{height:100vh;display:grid;grid-template-columns:60% 40%}
+.left,.right{padding:20px;overflow:auto}.left{border-right:1px solid var(--border-subtle)}
+.card{background:var(--surface-primary);border:1px solid var(--border-subtle);border-radius:12px;padding:16px;margin-bottom:14px}
+h1{margin:0 0 8px;font-size:20px} h2{margin:0 0 10px;font-size:14px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-tertiary)}
+textarea{width:100%;min-height:130px;resize:vertical;background:var(--surface-inset);color:var(--text-primary);border:1px solid var(--border-subtle);border-radius:10px;padding:12px;font:14px/1.5 var(--font-body)}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:10px} label{font-size:12px;color:var(--text-secondary)}
+select,button{background:var(--surface-inset);color:var(--text-primary);border:1px solid var(--border-subtle);border-radius:8px;padding:8px 10px;font-family:var(--font-body)}
+button{cursor:pointer} .primary{background:var(--accent);border-color:transparent;font-weight:600}
+button:disabled{opacity:.5;cursor:not-allowed}
+.code-wrap{position:relative} pre{background:var(--surface-code);border:1px solid var(--border-subtle);border-radius:10px;padding:14px;max-height:55vh;overflow:auto}
+code{font-family:var(--font-mono);font-size:12px;color:#c4c4cc;line-height:1.5}
+.actions{display:flex;gap:8px;margin-bottom:10px}
+.log{display:flex;flex-direction:column;gap:8px}.step{padding:10px;border-radius:8px;background:var(--surface-inset);font-size:13px}
+.step small{display:block;color:var(--text-secondary);margin-top:3px}.loading::after{content:' ...';animation:dots 1.2s steps(3,end) infinite}
+@keyframes dots{0%{content:' .'}33%{content:' ..'}66%{content:' ...'}}
+.report.ok{border-left:3px solid var(--ok)} .report.bad{border-left:3px solid var(--bad)}
+ul{margin:8px 0 0 18px;padding:0} .cost{font:13px var(--font-mono);color:var(--text-secondary)
+}
+.error{color:var(--bad);font-size:13px;margin-top:8px}
+@media (max-width:1000px){.container{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="container">
+  <section class="left">
+    <div class="card">
+      <h1>Nadi Builder</h1>
+      <textarea id="description" placeholder="I need a Nadi that monitors a website for changes and alerts me when the price drops below a threshold..."></textarea>
+      <div class="row">
+        <label>Priority
+          <select id="priority"><option value="cost">cost</option><option value="balanced">balanced</option><option value="quality" selected>quality</option></select>
+        </label>
+        <label>Output format
+          <select id="output"><option value="script" selected>script (download .py file)</option><option value="clipboard">clipboard (copy to clipboard)</option></select>
+        </label>
+        <button id="buildBtn" class="primary">Build Nadi</button>
+      </div>
+      <div id="error" class="error"></div>
+    </div>
+
+    <div class="card code-wrap">
+      <h2>Generated Code</h2>
+      <div class="actions">
+        <button id="copyBtn">Copy</button>
+        <button id="downloadBtn">Download .py</button>
+      </div>
+      <pre><code id="codeOut"># Your reviewed Nadi code will appear here.</code></pre>
+    </div>
+  </section>
+
+  <section class="right">
+    <div class="card">
+      <h2>Build Log</h2>
+      <div id="log" class="log"></div>
+    </div>
+
+    <div class="card">
+      <h2>Review Report</h2>
+      <div id="report" class="report"></div>
+    </div>
+
+    <div class="card">
+      <h2>Cost Summary</h2>
+      <div id="cost" class="cost">Writer: $0.000000 + Reviewer: $0.000000 = Total: $0.000000</div>
+    </div>
+  </section>
+</div>
+
+<script>
+const ENGINE = "http://localhost:8765";
+const codeOut = document.getElementById("codeOut");
+const logEl = document.getElementById("log");
+const reportEl = document.getElementById("report");
+const costEl = document.getElementById("cost");
+const errEl = document.getElementById("error");
+
+function fmtCost(v){ return v === 0 ? "free" : `$${Number(v || 0).toFixed(6)}`; }
+function numCost(v){ return Number(v || 0); }
+function addStep(title, detail, loading=false){
+  const el = document.createElement("div");
+  el.className = `step${loading ? " loading" : ""}`;
+  el.innerHTML = `<strong>${title}</strong><small>${detail}</small>`;
+  logEl.appendChild(el);
+  return el;
+}
+function setStep(el, title, detail){ el.className = "step"; el.innerHTML = `<strong>${title}</strong><small>${detail}</small>`; }
+
+function extractCode(content){
+  let code = (content || "").trim();
+  if(code.startsWith("```")){
+    code = code.split("\n").slice(1).join("\n");
+    code = code.replace(/```\s*$/, "").trim();
+  }
+  return code;
+}
+
+function parseReviewJson(content){
+  const text = (content || "").trim();
+  try { return JSON.parse(text); } catch {}
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced) { try { return JSON.parse(fenced[1].trim()); } catch {} }
+  const start = text.indexOf("{"); const end = text.lastIndexOf("}");
+  if(start !== -1 && end > start){ try { return JSON.parse(text.slice(start, end+1)); } catch {} }
+  throw new Error("Reviewer returned invalid JSON");
+}
+
+function pickReviewProvider(writerProvider){
+  const providers = ["openai", "anthropic", "google", "deepseek", "groq"];
+  for (const p of providers) if (p !== writerProvider) return p;
+  return null;
+}
+
+function buildWritePrompt(desc){
+return `Generate a complete, runnable Python script that functions as a Nadi for the Nadiru AI orchestration engine.
+
+The Nadi should: ${desc}
+
+Requirements:
+1. Use httpx to connect to the Nadiru engine at http://localhost:8765
+2. Connect with POST /connect (name, description, default_priority)
+3. Use POST /generate for AI interactions (nadi_id, prompt, priority)
+4. Include proper error handling for engine connectivity
+5. Show the routing info after each response (provider/model, cost, latency)
+6. Include a clear docstring explaining usage
+7. Use argparse for any command-line arguments
+8. Be a single file, under 150 lines
+9. Follow this cost display pattern:
+   cost = result['cost_estimate']
+   cost_str = 'free' if cost == 0 else f'${cost:.6f}'
+
+Return ONLY the Python code. No explanation before or after.
+No markdown code fences. Just the raw Python script.`;
+}
+
+function buildReviewPrompt(desc, code){
+return `You are a senior code reviewer. Review this Python script for a Nadi (an application that connects to the Nadiru AI orchestration engine).
+
+ORIGINAL SPECIFICATION: ${desc}
+
+CODE TO REVIEW:
+${code}
+
+Check for:
+1. Bugs or logical errors
+2. Security issues (injection, unsafe eval, etc.)
+3. Missing error handling
+4. Does it correctly use the Nadiru API? (POST /connect, POST /generate)
+5. Does it match the original specification?
+6. Code quality and readability
+
+Respond with ONLY valid JSON:
+{
+  "verdict": "APPROVED" or "REVISED",
+  "issues": ["list of issues found, empty if none"],
+  "changes": ["list of changes made, empty if approved as-is"],
+  "code": "the final corrected code (or original if approved)"
+}
+
+If the code is good, return APPROVED with the original code.
+If you find issues, return REVISED with the corrected code.";
+}
+
+async function apiGenerate(payload){
+  const r = await fetch(`${ENGINE}/generate`, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(payload)});
+  if(!r.ok) throw new Error(`Generate failed (${r.status})`);
+  return r.json();
+}
+
+async function buildNadi(description, priority){
+  const connStep = addStep("Step 1", "Classifying task...", true);
+  const conn = await fetch(`${ENGINE}/connect`, {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({name:"nadi-builder", default_priority: priority})});
+  if(!conn.ok) throw new Error("Could not connect to engine");
+  const { nadi_id } = await conn.json();
+  setStep(connStep, "Step 1", "Code generation task, complexity 4");
+
+  const writeStep = addStep("Step 2", "Writing code...", true);
+  const writeResult = await apiGenerate({nadi_id, prompt: buildWritePrompt(description), priority: "quality", prefer_provider: "anthropic"});
+  const writerProvider = writeResult.provider;
+  const writerModel = writeResult.model;
+  const generatedCode = extractCode(writeResult.content);
+  const writeLines = generatedCode ? generatedCode.split("\n").length : 0;
+  setStep(writeStep, "Step 2", `Writing code with ${writerProvider}/${writerModel}... Generated ${writeLines} lines`);
+
+  const reviewProvider = pickReviewProvider(writerProvider);
+  if(!reviewProvider){
+    const skip = addStep("Step 3", "No alternate provider available; skipped review");
+    addStep("Step 4", "Complete");
+    return { code: generatedCode, writeResult, reviewResult: null, issues: [], changes: [], verdict: "APPROVED" };
+  }
+
+  const reviewStep = addStep("Step 3", "Reviewing code...", true);
+  const reviewResult = await apiGenerate({nadi_id, prompt: buildReviewPrompt(description, generatedCode), priority: "quality", prefer_provider: reviewProvider});
+  const parsed = parseReviewJson(reviewResult.content);
+  const issues = Array.isArray(parsed.issues) ? parsed.issues : [];
+  const changes = Array.isArray(parsed.changes) ? parsed.changes : [];
+  const finalCode = extractCode(parsed.code || generatedCode);
+  const verdict = (parsed.verdict || "REVISED").toUpperCase();
+  const reviewInfo = `${reviewResult.provider}/${reviewResult.model}... ${issues.length} issues found, ${changes.length} changes made`;
+  setStep(reviewStep, "Step 3", `Reviewing with ${reviewInfo}`);
+  addStep("Step 4", "Complete");
+
+  return { code: finalCode, writeResult, reviewResult, issues, changes, verdict };
+}
+
+function renderReport(data){
+  if(!data){ reportEl.innerHTML = "No review yet."; return; }
+  const ok = data.verdict === "APPROVED";
+  reportEl.className = `report ${ok ? "ok" : "bad"}`;
+  const verdictText = ok ? "✅ APPROVED" : "❌ REVISED";
+  const issuesHtml = (data.issues || []).map(i => `<li>${i}</li>`).join("") || "<li>None</li>";
+  const changesHtml = (data.changes || []).map(c => `<li>${c}</li>`).join("") || "<li>None</li>";
+  reportEl.innerHTML = `<div><strong>${verdictText}</strong></div><div style="margin-top:8px"><strong>Issues</strong><ul>${issuesHtml}</ul></div><div style="margin-top:8px"><strong>Changes</strong><ul>${changesHtml}</ul></div>`;
+}
+
+document.getElementById("buildBtn").addEventListener("click", async () => {
+  const description = document.getElementById("description").value.trim();
+  const priority = document.getElementById("priority").value;
+  const outputMode = document.getElementById("output").value;
+  if(!description) return;
+
+  errEl.textContent = "";
+  logEl.innerHTML = "";
+  reportEl.className = "report";
+  reportEl.textContent = "Review in progress...";
+  codeOut.textContent = "Building...";
+  const btn = document.getElementById("buildBtn");
+  btn.disabled = true;
+
+  try {
+    const result = await buildNadi(description, priority);
+    codeOut.textContent = result.code;
+    renderReport(result);
+
+    const writerCost = numCost(result.writeResult?.cost_estimate);
+    const reviewerCost = numCost(result.reviewResult?.cost_estimate);
+    const totalCost = writerCost + reviewerCost;
+    costEl.textContent = `Writer: ${fmtCost(writerCost)} + Reviewer: ${fmtCost(reviewerCost)} = Total: ${fmtCost(totalCost)}`;
+
+    if(outputMode === "clipboard"){
+      await navigator.clipboard.writeText(result.code);
+    } else {
+      const blob = new Blob([result.code + "\n"], {type:"text/x-python"});
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "generated_nadi.py";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+  } catch (e) {
+    errEl.textContent = `${e.message}. Is Nadiru engine running on localhost:8765?`;
+    codeOut.textContent = "# Build failed";
+    reportEl.textContent = "Review report unavailable due to build error.";
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById("copyBtn").addEventListener("click", async () => {
+  await navigator.clipboard.writeText(codeOut.textContent || "");
+});
+
+document.getElementById("downloadBtn").addEventListener("click", () => {
+  const blob = new Blob([(codeOut.textContent || "") + "\n"], {type:"text/x-python"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "generated_nadi.py";
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+</script>
+</body>
+</html>
