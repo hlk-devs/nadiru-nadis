@@ -126,25 +126,83 @@ function pickReviewProvider(writerProvider){
 }
 
 function buildWritePrompt(desc){
-return `Generate a complete, runnable Python script that functions as a Nadi for the Nadiru AI orchestration engine.
+return `Generate a complete, runnable Python script that functions as a
+Nadi for the Nadiru AI orchestration engine.
 
 The Nadi should: ${desc}
 
-Requirements:
-1. Use httpx to connect to the Nadiru engine at http://localhost:8765
-2. Connect with POST /connect (name, description, default_priority)
-3. Use POST /generate for AI interactions (nadi_id, prompt, priority)
-4. Include proper error handling for engine connectivity
-5. Show the routing info after each response (provider/model, cost, latency)
-6. Include a clear docstring explaining usage
-7. Use argparse for any command-line arguments
-8. Be a single file, under 150 lines
-9. Follow this cost display pattern:
-   cost = result['cost_estimate']
-   cost_str = 'free' if cost == 0 else f'\${cost:.6f}'
+## NADIRU API REFERENCE (you MUST follow this exactly)
 
-Return ONLY the Python code. No explanation before or after.
-No markdown code fences. Just the raw Python script.`;
+Engine runs at: http://localhost:8765
+Library: httpx (use httpx.Client for sync, or httpx.AsyncClient for async)
+
+### Endpoints:
+
+POST /connect
+  Request: {"name": "my-nadi", "description": "what it does", "default_priority": "balanced"}
+  Response: {"nadi_id": "uuid-string"}
+
+POST /generate
+  Request: {"nadi_id": "uuid", "prompt": "your prompt", "priority": "balanced"}
+  Optional fields: messages (list of {role, content}), prefer_provider (string), max_cost (float)
+  Priority values: "cost", "balanced", "quality" (these are STRINGS, not numbers)
+  Response: {"content": "response text", "provider": "openai", "model": "gpt-4o",
+             "cost_estimate": 0.001, "latency_ms": 1500, "routing_reason": "...",
+             "request_id": "uuid"}
+
+POST /generate/stream
+  Same request as /generate
+  Returns: Server-Sent Events with types: routing, token, done
+
+GET /query
+  Params: nadi_id, limit, since
+  Response: {"interactions": [...]} 
+
+GET /providers
+  Response: {"providers": [{"name": "openai", "available": true, "models": [...]}]}
+
+GET /health
+  Response: {"status": "ok", "conductor_model": "...", "providers": [...]} 
+
+### Standard patterns:
+
+Connection:
+  client = httpx.Client(timeout=120.0)
+  resp = client.post('http://localhost:8765/connect', json={...})
+  nadi_id = resp.json()['nadi_id']
+
+Generation:
+  resp = client.post('http://localhost:8765/generate', json={
+      'nadi_id': nadi_id, 'prompt': prompt, 'priority': 'balanced'
+  })
+  result = resp.json()
+
+Routing info display:
+  cost = result['cost_estimate']
+  cost_str = 'free' if cost == 0 else f'$' + f'{cost:.6f}'
+  print(f'[{result["provider"]}/{result["model"]}] {cost_str} | {result["latency_ms"]}ms')
+
+Error handling:
+  try:
+      resp = client.post(...)
+      resp.raise_for_status()
+  except httpx.ConnectError:
+      print('Cannot connect to Nadiru engine on localhost:8765')
+      sys.exit(1)
+
+### Requirements for generated code:
+1. Single file, under 200 lines
+2. Use argparse for command-line arguments
+3. Include a module docstring with usage examples
+4. Use httpx (not requests)
+5. Always show routing info after each response
+6. Handle engine connectivity errors gracefully
+7. Use priority strings: 'cost', 'balanced', or 'quality'
+8. Never hardcode model names - let the Conductor choose
+9. If multiple generation calls are needed with different providers,
+   use prefer_provider to suggest (not force) a provider
+
+Return ONLY the Python code. No explanation. No markdown fences.`;
 }
 
 function buildReviewPrompt(desc, code){
@@ -161,7 +219,14 @@ Check for:
 3. Missing error handling
 4. Does it correctly use the Nadiru API? (POST /connect, POST /generate)
 5. Does it match the original specification?
-6. Code quality and readability
+6. Correct Nadiru API usage:
+   - Connects via POST /connect with name and default_priority (string)
+   - Generates via POST /generate with nadi_id, prompt, priority (string: cost/balanced/quality)
+   - Response fields: content, provider, model, cost_estimate, latency_ms
+   - Uses httpx, not requests
+   - Never hardcodes model names
+   - Shows routing info after responses
+7. Code quality and readability
 
 Respond with ONLY valid JSON:
 {
