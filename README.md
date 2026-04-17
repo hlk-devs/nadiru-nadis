@@ -1,13 +1,13 @@
-# Nadiru Nadis
+﻿# Nadiru Nadis
 
 ## What is a Nadi?
 
 A Nadi is any application that connects to the
 [Nadiru engine](https://github.com/hlk-devs/nadiru-engine).
-The engine handles intelligent routing between AI providers —
+The engine handles intelligent routing between AI providers â€”
 your Nadi just sends prompts and gets responses. Build a chatbot,
 a translation tool, a code assistant, a data pipeline, a full
-SaaS product — anything that needs AI goes through Nadiru.
+SaaS product â€” anything that needs AI goes through Nadiru.
 
 **The engine is the brain. Your Nadi is the body.**
 
@@ -27,6 +27,10 @@ through three HTTP endpoints.
 | [nadi-health](nadi-health/) | Test all providers, report status and latency | `python health.py` |
 | [nadi-translate](nadi-translate/) | Translate text between languages | `python translate.py "text" spanish` |
 | [nadi-summarize](nadi-summarize/) | Summarize text or files | `python summarize.py --file doc.txt` |
+| [nadi-codereview](nadi-codereview/) | Code review from file path | `python review.py file.py` |
+| [nadi-commit](nadi-commit/) | Git commit message generator | `python commit.py` |
+| [nadi-shell](nadi-shell/) | Natural language to shell command | `python shell.py "query"` |
+| [nadi-scraper](nadi-scraper/) | Web scraper generator | `python scraper.py "task"` |
 
 ## Building Your Own Nadi
 
@@ -53,7 +57,7 @@ print(resp.json()["content"])
 resp = httpx.get(f"{ENGINE}/query", params={"nadi_id": nadi_id})
 ```
 
-Three endpoints. That's the entire API. Build a Discord bot, a CLI tool, a web app, a batch processor — anything that can make HTTP requests can be a Nadi.
+Three endpoints. That's the entire API. Build a Discord bot, a CLI tool, a web app, a batch processor â€” anything that can make HTTP requests can be a Nadi.
 
 ## Setup
 
