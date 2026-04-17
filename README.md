@@ -32,6 +32,7 @@ through three HTTP endpoints.
 | [nadi-shell](nadi-shell/) | Natural language to shell command | `python shell.py "query"` |
 | [nadi-scraper](nadi-scraper/) | Web scraper generator | `python scraper.py "task"` |
 | [nadi-builder](nadi-builder/) | Build Nadis with AI + independent code review | Open `index.html` |
+| [nadi-deepreview](nadi-deepreview/) | Three-stage independent code review pipeline | `python deepreview.py file.py` |
 
 ## Building Your Own Nadi
 

@@ -141,7 +141,7 @@ Requirements:
 8. Be a single file, under 150 lines
 9. Follow this cost display pattern:
    cost = result['cost_estimate']
-   cost_str = 'free' if cost == 0 else f'${cost:.6f}'
+   cost_str = 'free' if cost == 0 else f'\${cost:.6f}'
 
 Return ONLY the Python code. No explanation before or after.
 No markdown code fences. Just the raw Python script.`;
@@ -172,7 +172,7 @@ Respond with ONLY valid JSON:
 }
 
 If the code is good, return APPROVED with the original code.
-If you find issues, return REVISED with the corrected code.";
+If you find issues, return REVISED with the corrected code.`;
 }
 
 async function apiGenerate(payload){
@@ -285,3 +285,5 @@ document.getElementById("downloadBtn").addEventListener("click", () => {
 </script>
 </body>
 </html>
+
+
