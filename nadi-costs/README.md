@@ -1,22 +1,7 @@
 # nadi-costs
 
-Terminal cost reporting for the Nadiru engine.
+**See exactly what your Nadiru engine is costing you, broken down by provider, model, and time period.**
+
+This Nadi reads from the engine's interaction history (every `/generate` call is logged with cost, provider, and model) and turns it into a readable cost report. Useful for understanding which Nadis are expensive, which providers are eating your budget, and whether your routing decisions are actually saving money.
 
 ## Usage
-
-```bash
-python costs.py              # Today's costs
-python costs.py --all        # All time
-python costs.py --days 7     # Last 7 days
-```
-
-## What it shows
-
-- Total interactions, cost, free vs paid breakdown
-- Spending by provider and by model
-- Most expensive single request
-
-## Requirements
-
-- Nadiru engine running on `localhost:8765`
-- `pip install httpx`

@@ -1,14 +1,7 @@
-﻿# nadi-models
+# nadi-models
 
-List all models available to your Nadiru engine.
+**List every model your Nadiru engine has discovered, organized by provider.**
+
+When you start the engine, it queries every configured provider for a list of available models and merges those lists with the metadata in `model_registry.json`. This Nadi reads that consolidated list and shows you what's actually available for routing. Useful for understanding what your engine has to work with.
 
 ## Usage
-
-    python models.py               # All models by provider
-    python models.py --count       # Summary counts only
-    python models.py --provider openai   # One provider
-
-## Requirements
-
-- Nadiru engine running on localhost:8765
-- pip install httpx

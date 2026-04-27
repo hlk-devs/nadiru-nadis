@@ -1,23 +1,7 @@
-﻿# nadi-codereview
+# nadi-codereview
 
-Code review tool that reads a local file and asks Nadiru for a structured review.
+**Get a structured code review for any local file in about 10 seconds.**
 
-## Requirements
-
-- Python 3.11+
-- `httpx` (`pip install httpx`)
-- Running Nadiru engine at `http://localhost:8765`
+This Nadi shows what `priority: "quality"` looks like in practice. Code review is one of those tasks where the difference between a cheap model and a smart model is enormous, so the Conductor will reliably route this to one of your strongest configured providers. Run it on a file and watch the routing details to see which model your engine considers best for analytical work.
 
 ## Usage
-
-```bash
-python review.py path/to/file.py
-python review.py path/to/file.py --focus security
-python review.py path/to/file.py --focus performance
-```
-
-## Notes
-
-- Uses Nadiru `/connect` and `/generate`.
-- Requests `priority: "quality"` for stronger review quality.
-- Prints routing details (provider/model, cost, latency) at the end.

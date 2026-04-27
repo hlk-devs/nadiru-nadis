@@ -1,27 +1,7 @@
 # nadi-summarize
 
-Summarize text using the Nadiru engine.
+**Summarize text or files at three different levels of detail.**
+
+A simple but useful Nadi that demonstrates `priority: "cost"` for tasks where quality plateaus quickly. Summarization is something almost every model handles competently, so the Conductor reliably picks an efficient one and you get the summary back in under a second for fractions of a cent.
 
 ## Usage
-
-```bash
-python summarize.py "Your long text to summarize goes here"
-python summarize.py --file article.txt
-python summarize.py --file article.txt --length short
-python summarize.py --file article.txt --length detailed
-```
-
-## Length options
-
-- `short` — 1-2 sentences
-- `concise` — short paragraph (default)
-- `detailed` — comprehensive summary
-
-## How it works
-
-Routes with `priority: cost` since summarization works well on cheaper models. The Conductor will typically pick a cost-effective model for this task type.
-
-## Requirements
-
-- Nadiru engine running on `localhost:8765`
-- `pip install httpx`

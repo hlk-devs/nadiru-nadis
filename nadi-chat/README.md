@@ -1,27 +1,7 @@
 # nadi-chat
 
-CLI chat interface for the Nadiru engine.
+**A CLI chat interface that shows you which model handled every response.**
+
+This is the "hello world" Nadi. It's the simplest useful thing you can build on top of Nadiru: a chat loop that sends prompts to the engine and prints responses. What makes it interesting is that you can switch routing priorities mid-conversation and watch the Conductor's behavior change in real time. Ask the same question with `/cost` then `/quality` and see different models pick it up.
 
 ## Usage
-
-```
-python chat.py
-```
-
-## Commands
-
-| Command | What it does |
-|---------|-------------|
-| `/cost` | Route to cheapest models |
-| `/speed` | Route to fastest models |
-| `/quality` | Route to best models |
-| `/balanced` | Default routing |
-| `/status` | Show session stats (cost, model usage) |
-| `/history` | Show recent interactions |
-| `/clear` | Clear conversation history |
-| `/quit` | Exit |
-
-## Requirements
-
-- Nadiru engine running on `localhost:8765`
-- `pip install httpx`

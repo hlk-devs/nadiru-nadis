@@ -1,24 +1,7 @@
-﻿# nadi-scraper
+# nadi-scraper
 
-Generate runnable web scraping scripts with Nadiru.
+**Describe what you want to scrape in plain English, get back a runnable Python scraper.**
 
-## Requirements
-
-- Python 3.11+
-- `httpx` (`pip install httpx`)
-- Running Nadiru engine at `http://localhost:8765`
+A code-generation Nadi. You give it a description like "scrape product names and prices from example.com/shop" and it returns a working scraper script. Behind the scenes it uses `priority: "quality"` because writing parser code that actually works on real HTML is harder than it looks, and cheap models tend to produce scrapers that break on the first edge case.
 
 ## Usage
-
-```bash
-python scraper.py "scrape product names and prices from example.com/shop"
-python scraper.py "get all article headlines from news.example.com" --output json
-python scraper.py "download all images from example.com/gallery" --output script
-```
-
-## Output modes
-
-- `--output json` (default): asks for a script oriented around JSON output.
-- `--output script`: saves generated script to `generated_scraper.py`.
-
-The request uses `priority: "quality"` and prints routing details at the end.
